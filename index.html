@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pi Toss Game – Fun Coin Flip!</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: "Segoe UI", Arial, sans-serif; background: linear-gradient(to right, #d9e7fa, #f6fafd); margin: 0; }
+    .container { max-width: 610px; margin: 2.2rem auto; background: #fff; padding: 2.2rem 2.5rem 2.5rem 2.5rem; border-radius: 22px;
+      box-shadow: 0 3px 32px #1fbee520; }
+    h1 { color: #1fbee5; font-size: 2em; text-align: center; letter-spacing: 2px; margin-bottom: 6px; }
+    h2 { margin-top: 2em; color: #222; }
+    label, input, button { font-size: 1em; }
+    form { margin-top: 12px; display: flex; flex-direction: column; gap: 0.6em; }
+    input[type="text"], input[type="number"] { padding: 8px 10px; border-radius: 8px; border: 1px solid #ddd; }
+    button { background: #1fbee5; color: #fff; padding: 10px 0; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+    button:hover, button:focus { background: #1596b7; }
+    .msg { margin: 1em 0 0.5em 0; color: #155724; background: #d4edda; border-radius: 8px; padding: 8px 12px; font-size: 1.13em; text-align: center; }
+    .error { background: #f8d7da; color: #a81c25; }
+    table { width: 100%; margin-top: 1em; border-collapse: collapse; table-layout: fixed;}
+    th, td { border: 1px solid #e2e2e2; padding: 8px; text-align: center; word-break: break-word; font-size: 1.04em; }
+    th { background: #e1f7fa; color: #11889c; }
+    tr.completed { background: #f7ffe1 !important; color: #444;}
+    .winner { font-weight: bold; background: #eaffd1 !important; color: #1cb850; }
+    .action { color: #0099db; }
+    .center { text-align: center; }
+    .coin-section { margin-top: 1.6em; display: flex; flex-direction: column; align-items: center; }
+    .coin-animation { width: 70px; height: 70px; margin: 10px auto; }
+    .coin { width: 66px; height: 66px; border-radius: 50%; margin: 0 auto; box-shadow: 0 6px 20px #e2bf3a60; display: flex; align-items: center; justify-content: center; font-size: 2.8em; font-weight: bold; color: #a87b09; transition: transform 1.2s cubic-bezier(.6,-0.3,.6,1.4);}
+    .coin-flip { transform: rotateY(2160deg); }
+    .side-label { font-size: 1.08em; padding: 5px; border-radius: 8px; margin-top: 10px;}
+    .side-heads { background: #feee96; color: #d7aa0f; }
+    .side-tails { background: #b6a9ea; color: #504484; }
+    .avatars { font-size: 2em; }
+    .tables-wrapper {max-height:260px; overflow-y: auto; margin-bottom: 0.9em;}
+    @media (max-width:700px) {
+      .container { max-width: 97vw; padding:1em 0.3em;}
+    }
+    .fade-in { animation: fadeIn .5s; }
+    @keyframes fadeIn { from { opacity: 0;} to {opacity:1;} }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Pi Toss Game</h1>
+    <div class="msg center" id="mainMsg" style="display:none"></div>
+
+    <h2>Create Table</h2>
+    <form id="create-table-form" autocomplete="off">
+      <input type="text" id="creator" placeholder="Your Name (for avatar)" required>
+      <input type="number" id="bet" placeholder="Bet Amount (fun only)" required min="1" step="0.01">
+      <button type="submit">Create Table</button>
+    </form>
+
+    <h2>Tables (Live)</h2>
+    <div class="tables-wrapper"><div id="tables"></div></div>
+
+    <h2>Join & Play Toss</h2>
+    <form id="join-form" autocomplete="off">
+      <input type="text" id="join-table-id" placeholder="Table ID (see above)" required>
+      <input type="text" id="join-name" placeholder="Your Name" required>
+      <button type="submit">Join This Table</button>
+    </form>
+    <div id="tossSection" class="coin-section" style="display:none;">
+      <div class="avatars" id="avatarView"></div>
+      <div class="coin-animation"><div id="coin" class="coin">🪙</div></div>
+      <div id="sideLbl" class="side-label"></div>
+      <button id="tossBtn">TOSS COIN</button>
+    </div>
+  </div>
+<script>
+const API = "https://pi-toss-game.onrender.com";
+const mainMsg = document.getElementById('mainMsg');
+let currentTables = [];
+function showMsg(msg, error=false) {
+  mainMsg.style.display = 'block';
+  mainMsg.textContent = msg;
+  mainMsg.className = 'msg fade-in' + (error ? ' error':'');
+  setTimeout(()=>{ mainMsg.style.display = 'none'; }, 3400 + error*900);
+}
+async function fetchTables() {
+  let r = await fetch(`${API}/api/open_tables`);
+  let d = await r.json();
+  currentTables = d.tables || [];
+  let html = '<table><tr><th>Table ID</th><th>Creator</th><th>Bet</th><th>Status</th><th>Players</th><th>Avatars</th><th>Result</th></tr>';
+  if (currentTables.length)
+    for(let t of currentTables)
+      html += `<tr${t.status==='completed' ? ' class="completed"' : ''}>
+        <td>${t.id}</td>
+        <td>${t.creator} ${t.creator_avatar||""}</td>
+        <td>${t.bet_amount}</td>
+        <td>${t.status.charAt(0).toUpperCase()+t.status.slice(1)}</td>
+        <td>${t.players.map(p=>'<span>'+p+'</span>').join(', ')}</td>
+        <td class="avatars">${(t.avatars||[]).join(' ')}</td>
+        <td>${t.winner ? `<span class="winner">${t.winner} (${t.winning_side||""})</span>` : '-'}</td>
+      </tr>`;
+  else
+    html += `<tr><td colspan="7" class="center action">No active tables — create one?</td></tr>`;
+  html += '</table>';
+  document.getElementById('tables').innerHTML = html;
+}
+fetchTables();
+setInterval(fetchTables, 3300); // auto-refresh tables, every 3s
+
+document.getElementById('create-table-form').onsubmit = async (e) => {
+  e.preventDefault();
+  let creator = document.getElementById('creator').value;
+  let bet = document.getElementById('bet').value;
+  let res = await fetch(`${API}/api/create_table`, {
+    method:"POST", headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({creator, bet_amount:bet})
+  });
+  let dat = await res.json();
+  if(dat.success) {
+    showMsg("Table created! Table ID: " + dat.table.id);
+    fetchTables();
+    document.getElementById('create-table-form').reset();
+  } else showMsg(dat.detail||"Error creating table", true);
+};
+
+let joinedTableId = null, joiner = null, myAvatars = [];
+document.getElementById('join-form').onsubmit = async (e) => {
+  e.preventDefault();
+  joinedTableId = document.getElementById('join-table-id').value;
+  joiner = document.getElementById('join-name').value;
+  try {
+    let r = await fetch(`${API}/api/join_table`, {
+      method: "POST", headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({table_id: joinedTableId, player: joiner})
+    });
+    let dat = await r.json();
+    if (dat.success) {
+      showMsg("Joined table! Ready to toss with: " + dat.table.players.join(" & "));
+      myAvatars = dat.table.avatars;
+      updateAvatars(myAvatars, dat.table.players);
+      document.getElementById('tossSection').style.display = '';
+      document.getElementById('sideLbl').textContent = '';
+      document.getElementById('coin').textContent = "🪙";
+    } else {
+      showMsg(dat.detail || "Error joining table.", true);
+      joinedTableId = null; joiner = null;
+      document.getElementById('tossSection').style.display = 'none';
+    }
+  } catch(e) { showMsg("Issue joining — table maybe full? Try again.", true);}
+};
+
+function updateAvatars(avatars, players) {
+  let s = `<b>Players:</b> `;
+  if(Array.isArray(avatars))
+    avatars.forEach((a, i)=>{ s += `<span>${a} <b>${(players||[])[i]}</b></span> `; });
+  document.getElementById('avatarView').innerHTML = s;
+}
+
+document.getElementById('tossBtn').onclick = async (e) => {
+  e.preventDefault();
+  if (!joinedTableId || !joiner) return;
+  let coinDiv = document.getElementById('coin');
+  coinDiv.textContent = "🪙";
+  document.getElementById('sideLbl').textContent = "";
+  coinDiv.classList.add('coin-flip');
+  setTimeout(()=>{ coinDiv.classList.remove('coin-flip'); },950);
+
+  let resp = await fetch(`${API}/api/toss_coin`, {
+    method:"POST", headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ table_id: joinedTableId })
+  });
+  let data = await resp.json();
+  if(data.winner && data.players) {
+    // Animate head/tail draw
+    setTimeout(()=>{
+      let isHead = data.side === "Heads";
+      coinDiv.textContent = isHead ? "🟡" : "⚫";
+      let lbl = (isHead ? 'HEADS' : 'TAILS') + " — " +
+          data.players.map((p,i)=>`${data.avatars[i]} <b>${p}</b>` +
+          (data.winner===p?' 🏆':'')).join(' vs ') +
+          "\n";
+      document.getElementById('sideLbl').className = "side-label "+(isHead?"side-heads":"side-tails");
+      document.getElementById('sideLbl').innerHTML = lbl + `<br><b>${data.winner} WINS!</b>`;
+    }, 640);
+    fetchTables();
+    joinedTableId = null;
+    joiner = null;
+    setTimeout(()=>{
+      document.getElementById('tossSection').style.display='none';
+      coinDiv.textContent="🪙";
+      document.getElementById('sideLbl').textContent="";
+    },4600);
+  } else showMsg("Toss failed: "+(data.detail||""), true);
+};
+</script>
+</body>
+</html>
