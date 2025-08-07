@@ -7,25 +7,24 @@ import random
 
 app = FastAPI()
 
-# Insert your actual Netlify and local dev URLs here
+# <<-- PUT YOUR NETLIFY SITE URL HERE -->> (keep exact domain & protocol, no trailing /)
 origins = [
-    "https://tubular-granita-112912.netlify.app",  # Your Netlify site URL
-    "http://localhost:8000",                      # Local server for local frontend dev
+    "https://roaring-beijinho-30faeb.netlify.app",   # Your live Netlify site
+    "http://localhost:8000",                         # Local dev (optional, safe)
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,            # Secure: only allow trusted origins
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Avatar emojis for uniqueness/fun
+# Fun avatar emoji set!
 AVATARS = ["👧", "🧑", "👦", "👩‍🎤", "🦸", "🤴", "👩‍💻", "🦹", "🧙‍♂️", "🧞‍♂️", "🧝‍♀️"]
 
 def assign_avatar(name: str):
-    # Consistent avatar per name
     return AVATARS[hash(name) % len(AVATARS)]
 
 class Table(BaseModel):
@@ -39,7 +38,6 @@ class Table(BaseModel):
     winner: Optional[str] = ""
     winning_side: Optional[str] = ""
 
-# In-memory table list for demo/testing.
 tables = []
 
 @app.get("/")
@@ -48,7 +46,6 @@ def root():
 
 @app.get("/api/open_tables")
 def get_open_tables():
-    # Show tables that aren't yet completed
     return {"tables": [table for table in tables if table.status in ["open", "full"]]}
 
 @app.post("/api/create_table")
